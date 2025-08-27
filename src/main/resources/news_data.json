@@ -1,0 +1,75 @@
+[
+  {
+    "id": "19aaddc0-7508-4659-9c32-2216107f8604",
+    "title": "Attempts to mislead people: B'desh leader Yunus on coup rumours",
+    "description": "Bangladesh's interim government leader Muhammad Yunus dismissed rumours that a coup is being plotted against him by the military, calling the claims \"attempts to mislead people\". \"In order to destabi...",
+    "url": "https://www.news18.com/amp/world/attempts-to-mislead-people-muhammed-yunus-dismisses-bangladesh-coup-rumours-9274884.html",
+    "publication_date": "2025-03-26T04:46:55",
+    "source_name": "News18",
+    "category": [
+      "world"
+    ],
+    "relevance_score": 0.4,
+    "latitude": 17.900636,
+    "longitude": 77.465262
+  },
+  {
+    "id": "099503a1-d4b6-460e-ad9c-19212d9dd9ac",
+    "title": "Clash erupts in J'khand's Hazaribagh during Mangla procession",
+    "description": "A clash broke out between two groups during Ram Navami Mangla julus (procession) at Jhanda Chowk of Jharkhand's Hazaribagh on Tuesday night, officials said. \"One group was playing some songs during th...",
+    "url": "https://www.aninews.in/news/national/general-news/jharkhand-clash-breaks-out-in-hazaribaghs-jhanda-chowk-during-mangla-procession20250326091753/",
+    "publication_date": "2025-03-26T04:42:23",
+    "source_name": "ANI News",
+    "category": [
+      "national"
+    ],
+    "relevance_score": 0.86,
+    "latitude": 19.697352,
+    "longitude": 73.865399
+  },
+  {
+    "id": "tech-001",
+    "title": "Apple Announces New iPhone 15 with Advanced AI Features",
+    "description": "Apple has unveiled its latest iPhone 15 featuring groundbreaking AI capabilities, improved camera systems, and enhanced performance. The new device represents a significant leap forward in smartphone technology.",
+    "url": "https://www.apple.com/iphone-15",
+    "publication_date": "2025-08-25T22:12:21",
+    "source_name": "Apple News",
+    "category": [
+      "Technology",
+      "Mobile"
+    ],
+    "relevance_score": 0.95,
+    "latitude": 37.7749,
+    "longitude": -122.4194
+  },
+  {
+    "id": "biz-001",
+    "title": "Tesla Reports Record Q3 Earnings, Stock Surges 15%",
+    "description": "Tesla has reported exceptional third-quarter earnings, exceeding analyst expectations. The electric vehicle manufacturer's stock price has surged by 15% following the announcement.",
+    "url": "https://www.tesla.com/earnings",
+    "publication_date": "2025-08-24T22:12:21",
+    "source_name": "Reuters",
+    "category": [
+      "Business",
+      "Technology"
+    ],
+    "relevance_score": 0.88,
+    "latitude": 37.7749,
+    "longitude": -122.4194
+  },
+  {
+    "id": "sports-001",
+    "title": "Manchester United Secures Victory in Champions League Opener",
+    "description": "Manchester United has started their Champions League campaign with an impressive victory, showcasing tactical brilliance and individual skill that has fans optimistic about the season ahead.",
+    "url": "https://www.manutd.com/news",
+    "publication_date": "2025-08-25T22:12:21",
+    "source_name": "BBC Sport",
+    "category": [
+      "Sports",
+      "Football"
+    ],
+    "relevance_score": 0.82,
+    "latitude": 53.4808,
+    "longitude": -2.2426
+  }
+]
