@@ -9,10 +9,13 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 @Primary
@@ -20,8 +23,11 @@ public class RealLLMServiceImpl implements LLMService {
     
     private static final Logger logger = LoggerFactory.getLogger(RealLLMServiceImpl.class);
     
-    // Hugging Face Inference API endpoint (free tier)
-    private static final String HUGGING_FACE_API_URL = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium";
+    @Value("${llm.huggingface.url}")
+    private String huggingFaceApiUrl;
+
+    @Value("${llm.huggingface.token}")
+    private String huggingFaceApiKey;
     
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -37,33 +43,25 @@ public class RealLLMServiceImpl implements LLMService {
     
     @Override
     public NewsQueryRequest processQuery(NewsQueryRequest request) {
-        logger.info("Processing query with real LLM: {}", request.getQuery());
-        
         try {
-            // Extract entities using LLM
-            String entities = extractEntities(request.getQuery());
-            request.setEntities(entities);
-            
-            // Extract concepts using LLM
-            String concepts = extractConcepts(request.getQuery());
-            request.setConcepts(concepts);
-            
-            // Determine intent using LLM
             String intent = determineIntent(request.getQuery());
+            String entities = extractEntities(request.getQuery());
+            String category = extractConcepts(request.getQuery());
+
             request.setIntent(intent);
-            
-            logger.info("LLM Processing completed - Entities: {}, Concepts: {}, Intent: {}", 
-                       entities, concepts, intent);
-            
+            request.setEntities(entities);
+            request.setCategory(category);
+
+            logger.info("LLM Processing completed - Entities: {}, Category: {}, Intent: {}", entities, category, intent);
+            return request;
         } catch (Exception e) {
-            logger.error("Error processing query with LLM, falling back to keyword matching", e);
-            // Fallback to keyword matching if LLM fails
-            request.setEntities(extractEntitiesFallback(request.getQuery()));
-            request.setConcepts(extractConceptsFallback(request.getQuery()));
-            request.setIntent(determineIntentFallback(request.getQuery()));
+            logger.error("Error calling real LLM service: {}", e.getMessage());
+            // Minimal pass-through on error
+            request.setIntent(request.getIntent());
+            request.setEntities(request.getEntities());
+            request.setCategory(request.getCategory());
+            return request;
         }
-        
-        return request;
     }
     
     @Override
@@ -140,9 +138,10 @@ public class RealLLMServiceImpl implements LLMService {
         );
         
         Request request = new Request.Builder()
-                .url(HUGGING_FACE_API_URL)
+                .url(huggingFaceApiUrl)
                 .post(body)
                 .addHeader("Content-Type", "application/json")
+                .addHeader("Authorization", "Bearer " + huggingFaceApiKey)
                 .build();
         
         try (Response response = httpClient.newCall(request).execute()) {

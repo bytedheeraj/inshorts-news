@@ -1,20 +1,22 @@
 package com.example.inshorts.controller;
 
+import com.example.inshorts.dto.ApiResponse;
+import com.example.inshorts.dto.News;
 import com.example.inshorts.dto.NewsQueryRequest;
 import com.example.inshorts.dto.NewsResponse;
-import com.example.inshorts.entity.News;
+import com.example.inshorts.dto.PageMeta;
+
 import com.example.inshorts.service.NewsService;
 import jakarta.validation.Valid;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Comparator;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/news")
-@CrossOrigin(origins = "*")
+@RequestMapping("/api/v1/news")
 public class NewsController {
     
     @Autowired
@@ -24,93 +26,170 @@ public class NewsController {
      * Main endpoint for contextual news retrieval
      */
     @PostMapping("/query")
-    public ResponseEntity<NewsResponse> processNewsQuery(@Valid @RequestBody NewsQueryRequest request) {
-
-        NewsResponse response = newsService.processNewsQuery(request);
-        System.out.println("starting query....");
-        return ResponseEntity.ok(response);
+    public ResponseEntity<ApiResponse<NewsResponse>> processNewsQuery(@Valid @RequestBody NewsQueryRequest request) {
+        try {
+            NewsResponse response = newsService.processNewsQuery(request);
+            // Attach simple meta (no pagination here)
+            response.setMeta(PageMeta.builder()
+                    .page(1)
+                    .pageSize(response.getArticles() != null ? response.getArticles().size() : 0)
+                    .totalPages(1)
+                    .totalCount(response.getTotalCount())
+                    .build());
+            return ResponseEntity.ok(ApiResponse.ok(response, response.getMeta()));
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(ex.getMessage()));
+        }
     }
     
     /**
-     * Get news by category
+     * Get news by category (sorted by publicationDate desc), paginated
      */
     @GetMapping("/category/{category}")
-    public ResponseEntity<List<News>> getNewsByCategory(@PathVariable String category) {
-        List<News> news = newsService.getNewsByCategory(category);
-        return ResponseEntity.ok(news);
+    public ResponseEntity<ApiResponse<List<News>>> getNewsByCategory(
+            @PathVariable String category,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size) {
+        List<News> list = newsService.getNewsByCategory(category);
+        list.sort(Comparator.comparing(News::getPublicationDate, Comparator.nullsLast(Comparator.naturalOrder())).reversed());
+        int from = Math.min(page * size, list.size());
+        int to = Math.min(from + size, list.size());
+        List<News> slice = list.subList(from, to);
+        PageMeta meta = PageMeta.builder()
+                .page(page)
+                .pageSize(size)
+                .totalCount(list.size())
+                .totalPages((int) Math.ceil((double) list.size() / size))
+                .build();
+        return ResponseEntity.ok(ApiResponse.ok(slice, meta));
     }
     
     /**
-     * Get news by source
+     * Get news by source (sorted by publicationDate desc), paginated
      */
     @GetMapping("/source/{source}")
-    public ResponseEntity<List<News>> getNewsBySource(@PathVariable String source) {
-        List<News> news = newsService.getNewsBySource(source);
-        return ResponseEntity.ok(news);
+    public ResponseEntity<ApiResponse<List<News>>> getNewsBySource(
+            @PathVariable String source,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size) {
+        List<News> list = newsService.getNewsBySource(source);
+        list.sort(Comparator.comparing(News::getPublicationDate, Comparator.nullsLast(Comparator.naturalOrder())).reversed());
+        int from = Math.min(page * size, list.size());
+        int to = Math.min(from + size, list.size());
+        List<News> slice = list.subList(from, to);
+        PageMeta meta = PageMeta.builder()
+                .page(page)
+                .pageSize(size)
+                .totalCount(list.size())
+                .totalPages((int) Math.ceil((double) list.size() / size))
+                .build();
+        return ResponseEntity.ok(ApiResponse.ok(slice, meta));
     }
     
     /**
-     * Get news by relevance score threshold
+     * Get news by relevance score threshold (sorted by relevanceScore desc), paginated
      */
     @GetMapping("/score")
-    public ResponseEntity<List<News>> getNewsByScore(@RequestParam(defaultValue = "0.7") Double threshold) {
-        List<News> news = newsService.getNewsByScore(threshold);
-        return ResponseEntity.ok(news);
+    public ResponseEntity<ApiResponse<List<News>>> getNewsByScore(
+            @RequestParam(defaultValue = "0.7") Double threshold,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size) {
+        List<News> list = newsService.getNewsByScore(threshold);
+        list.sort(Comparator.comparing(News::getRelevanceScore, Comparator.nullsLast(Comparator.naturalOrder())).reversed());
+        int from = Math.min(page * size, list.size());
+        int to = Math.min(from + size, list.size());
+        List<News> slice = list.subList(from, to);
+        PageMeta meta = PageMeta.builder()
+                .page(page)
+                .pageSize(size)
+                .totalCount(list.size())
+                .totalPages((int) Math.ceil((double) list.size() / size))
+                .build();
+        return ResponseEntity.ok(ApiResponse.ok(slice, meta));
     }
     
     /**
-     * Search news by text query
+     * Search news by text query (sorted by publicationDate desc as simple relevance), paginated
      */
     @GetMapping("/search")
-    public ResponseEntity<List<News>> searchNews(@RequestParam String q) {
-        List<News> news = newsService.searchNews(q);
-        return ResponseEntity.ok(news);
+    public ResponseEntity<ApiResponse<List<News>>> searchNews(
+            @RequestParam String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size) {
+        List<News> list = newsService.searchNews(q);
+        list.sort(Comparator.comparing(News::getPublicationDate, Comparator.nullsLast(Comparator.naturalOrder())).reversed());
+        int from = Math.min(page * size, list.size());
+        int to = Math.min(from + size, list.size());
+        List<News> slice = list.subList(from, to);
+        PageMeta meta = PageMeta.builder()
+                .page(page)
+                .pageSize(size)
+                .totalCount(list.size())
+                .totalPages((int) Math.ceil((double) list.size() / size))
+                .build();
+        return ResponseEntity.ok(ApiResponse.ok(slice, meta));
     }
     
     /**
-     * Get nearby news within specified radius
+     * Get nearby news within specified radius (sorted by publicationDate desc), paginated
      */
     @GetMapping("/nearby")
-    public ResponseEntity<List<News>> getNearbyNews(
+    public ResponseEntity<ApiResponse<List<News>>> getNearbyNews(
             @RequestParam Double latitude,
             @RequestParam Double longitude,
-            @RequestParam(defaultValue = "10.0") Double radius) {
-        List<News> news = newsService.getNearbyNews(latitude, longitude, radius);
-        return ResponseEntity.ok(news);
+            @RequestParam(defaultValue = "10.0") Double radius,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size) {
+        List<News> list = newsService.getNearbyNews(latitude, longitude, radius);
+        list.sort(Comparator.comparing(News::getPublicationDate, Comparator.nullsLast(Comparator.naturalOrder())).reversed());
+        int from = Math.min(page * size, list.size());
+        int to = Math.min(from + size, list.size());
+        List<News> slice = list.subList(from, to);
+        PageMeta meta = PageMeta.builder()
+                .page(page)
+                .pageSize(size)
+                .totalCount(list.size())
+                .totalPages((int) Math.ceil((double) list.size() / size))
+                .build();
+        return ResponseEntity.ok(ApiResponse.ok(slice, meta));
     }
     
     /**
-     * Get all news articles
+     * Get all news articles (paginated)
      */
     @GetMapping("/all")
-    public ResponseEntity<List<News>> getAllNews() {
-        List<News> news = newsService.getAllNews();
-        return ResponseEntity.ok(news);
+    public ResponseEntity<ApiResponse<List<News>>> getAllNews(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size) {
+        List<News> list = newsService.getAllNews();
+        list.sort(Comparator.comparing(News::getPublicationDate, Comparator.nullsLast(Comparator.naturalOrder())).reversed());
+        int from = Math.min(page * size, list.size());
+        int to = Math.min(from + size, list.size());
+        List<News> slice = list.subList(from, to);
+        PageMeta meta = PageMeta.builder()
+                .page(page)
+                .pageSize(size)
+                .totalCount(list.size())
+                .totalPages((int) Math.ceil((double) list.size() / size))
+                .build();
+        return ResponseEntity.ok(ApiResponse.ok(slice, meta));
     }
     
     /**
      * Save a single news article
      */
     @PostMapping("/save")
-    public ResponseEntity<News> saveNews(@RequestBody News news) {
-        News savedNews = newsService.saveNews(news);
-        return ResponseEntity.ok(savedNews);
+    public ResponseEntity<ApiResponse<News>> saveNews(@RequestBody News newsEntity) {
+        News savedNews = newsService.saveNews(newsEntity);
+        return ResponseEntity.ok(ApiResponse.ok(savedNews, null));
     }
     
     /**
      * Save multiple news articles
      */
     @PostMapping("/save-all")
-    public ResponseEntity<List<News>> saveAllNews(@RequestBody List<News> newsList) {
-        List<News> savedNews = newsService.saveAllNews(newsList);
-        return ResponseEntity.ok(savedNews);
-    }
-    
-    /**
-     * Health check endpoint
-     */
-    @GetMapping("/health")
-    public ResponseEntity<String> health() {
-        return ResponseEntity.ok("News Service is running!");
+    public ResponseEntity<ApiResponse<List<News>>> saveAllNews(@RequestBody List<News> newsEntityList) {
+        List<News> savedNews = newsService.saveAllNews(newsEntityList);
+        return ResponseEntity.ok(ApiResponse.ok(savedNews, null));
     }
 }

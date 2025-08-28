@@ -1,279 +1,289 @@
-# Contextual News Data Retrieval System
+# Inshorts News API - Contextual News Data Retrieval System
 
-A sophisticated backend system that can fetch and organize news articles from a data source, simulating different API functionalities, and enrich these articles with LLM-generated insights.
+A Spring Boot application that provides intelligent news retrieval using LLM integration, geospatial queries, and trending analysis.
 
-## Features
+## 🚀 Features
 
-- **LLM-Powered Query Processing**: Automatically extracts entities, concepts, and intent from natural language queries
-- **Contextual Data Retrieval**: Routes queries to appropriate data retrieval strategies based on detected intent
-- **Multiple Retrieval Strategies**: Supports category, source, score, search, and nearby location-based retrieval
-- **Geographic Awareness**: Considers user location for relevant news delivery
-- **Relevance Scoring**: Ranks articles by relevance score for optimal user experience
-- **RESTful API**: Clean, intuitive API endpoints for easy integration
+### Core Functionality
+- **Intelligent News Retrieval**: Uses LLM to understand user intent and extract entities and categories
+- **Geospatial Queries**: Find news articles near specific locations using MongoDB geospatial features
+- **Multi-criteria Search**: Search by category, source, relevance score, or text content
+- **Trending (Bonus)**: Location-based trending news with user engagement analytics
 
-## Technical Stack
+### Advanced Features
+- **LLM Integration**: Hugging Face API integration (with safe handling)
+- **Redis Caching**: High-performance caching for trending feeds and news queries
+- **MongoDB**: Stores articles and supports geospatial queries
 
-- **Backend**: Spring Boot 3.4.9 with Java 17
-- **Database**: H2 In-Memory Database (can be easily switched to PostgreSQL/MySQL)
-- **Data Access**: Spring Data JPA with custom queries
-- **API**: RESTful endpoints with JSON responses
-- **Validation**: Bean Validation for request validation
-- **Documentation**: Comprehensive API documentation
+## 🏗️ Architecture
 
-## System Architecture
+### Technology Stack
+- **Java 17** with Spring Boot 3.4.9
+- **MongoDB** for data persistence
+- **Redis** for caching
+- **Spring Data MongoDB** for database operations
+- **Spring Cache** with Redis implementation
+- **Lombok** for code generation
+
+### Design Patterns
+- **Service Layer Pattern**: Clean separation of business logic
+- **Repository Pattern**: Data access abstraction
+- **DTO Pattern**: Data transfer objects for API responses
+- **Mapper Pattern**: Entity-DTO conversion
+- **Strategy Pattern**: Intent-based query routing
+
+## 📁 Project Structure
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   REST API      │    │   LLM Service   │    │   News Service  │
-│   Controller    │◄──►│   (NLP Logic)   │◄──►│   (Business     │
-│                 │    │                 │    │    Logic)       │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Validation    │    │   Entity        │    │   Repository    │
-│   Layer         │    │   Extraction    │    │   Layer         │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                                       │
-                                                       ▼
-                                              ┌─────────────────┐
-                                              │   H2 Database   │
-                                              │   (In-Memory)   │
-                                              └─────────────────┘
+src/main/java/com/example/inshorts/
+├── config/                 # Configuration classes
+│   ├── CacheConfig.java    # Redis caching configuration
+│   └── RedisConfig.java    # Redis connection configuration
+├── controller/             # REST API controllers
+│   ├── NewsController.java # Core news endpoints
+│   └── TrendingController.java # Trending news endpoints
+├── dto/                    # Data Transfer Objects
+│   ├── News.java          # News response DTO
+│   ├── NewsQueryRequest.java # Query request DTO
+│   ├── NewsResponse.java  # Query response DTO
+│   └── TrendingArticle.java # Trending article DTO
+├── entity/                 # MongoDB entities
+│   ├── NewsEntity.java    # News article entity
+│   └── UserEvent.java     # User interaction events
+├── enums/                  # Enumerations
+│   └── IntentType.java    # Query intent types
+├── repository/             # Data access layer
+│   ├── NewsRepository.java # News data operations
+│   └── UserEventRepository.java # User event operations
+├── service/                # Business logic layer
+│   ├── NewsMapper.java    # Entity-DTO mapper
+│   ├── NewsService.java   # News service interface
+│   ├── TrendingService.java # Trending service interface
+│   └── impl/              # Service implementations
+│       ├── NewsServiceImpl.java
+│       ├── RealLLMServiceImpl.java
+│       └── TrendingServiceImpl.java
+└── InshortsApplication.java # Main application class
 ```
 
-## API Endpoints
+## 🔧 Configuration
 
-### Main Query Endpoint
-- **POST** `/api/news/query` - Process contextual news queries
+### Application Properties
+```properties
+# Server Configuration
+server.port=8080
 
-### Specific Retrieval Endpoints
-- **GET** `/api/news/category/{category}` - Get news by category
-- **GET** `/api/news/source/{source}` - Get news by source
-- **GET** `/api/news/score?threshold={value}` - Get news by relevance score
-- **GET** `/api/news/search?q={query}` - Search news by text
-- **GET** `/api/news/nearby?latitude={lat}&longitude={lng}&radius={km}` - Get nearby news
-- **GET** `/api/news/all` - Get all news articles
+# MongoDB Configuration
+spring.data.mongodb.host=localhost
+spring.data.mongodb.port=27017
+spring.data.mongodb.database=inshorts
+spring.data.mongodb.collection=news_data
 
-### Data Management Endpoints
-- **POST** `/api/news/save` - Save a single news article
-- **POST** `/api/news/save-all` - Save multiple news articles
-- **GET** `/api/news/health` - Health check
+# Redis Configuration
+spring.data.redis.host=localhost
+spring.data.redis.port=6379
+spring.cache.type=redis
+spring.cache.redis.time-to-live=300000
 
-## Usage Examples
-
-### 1. Contextual Query Processing
-
-**Request:**
-```json
-POST /api/news/query
-{
-  "query": "Latest developments in the Elon Musk Twitter acquisition near Palo Alto",
-  "latitude": 37.4419,
-  "longitude": -122.1430
-}
+# LLM Configuration
+llm.huggingface.url=https://api-inference.huggingface.co/models
+llm.huggingface.token=${HUGGINGFACE_TOKEN:}
 ```
 
-**Expected Response:**
-```json
-{
-  "articles": [...],
-  "totalCount": 2,
-  "query": "Latest developments in the Elon Musk Twitter acquisition near Palo Alto",
-  "intent": "nearby",
-  "entities": "Elon Musk, Twitter/X, Palo Alto",
-  "concepts": "business acquisition, social media, development",
-  "processingTimeMs": 45
-}
+### Dependencies
+```xml
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-mongodb</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-cache</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-redis</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <optional>true</optional>
+    </dependency>
+</dependencies>
 ```
 
-### 2. Category-Based Retrieval
+## 🚀 API Endpoints
 
-**Request:**
-```json
-POST /api/news/query
-{
-  "query": "Top technology news from the New York Times",
-  "latitude": 40.7128,
-  "longitude": -74.0060
-}
-```
+### News Endpoints
+- `GET /api/news/all` - Get all news articles
+- `GET /api/news/category/{category}` - Get news by category
+- `GET /api/news/source/{source}` - Get news by source
+- `GET /api/news/score/{threshold}` - Get news above relevance score
+- `GET /api/news/search?q={query}` - Search news by text
+- `GET /api/news/nearby?lat={lat}&lon={lon}&radius={km}` - Get nearby news
+- `POST /api/news/query` - Process intelligent news query
 
-**Expected Response:**
-```json
-{
-  "articles": [...],
-  "totalCount": 3,
-  "query": "Top technology news from the New York Times",
-  "intent": "source",
-  "entities": "New York Times",
-  "concepts": "technology, news",
-  "processingTimeMs": 32
-}
-```
+### Trending Endpoints
+- `GET /api/trending?lat={lat}&lon={lon}&limit={n}` - Get trending news
+- `GET /api/trending/category/{category}?lat={lat}&lon={lon}&limit={n}` - Get trending by category
+- `POST /api/trending/simulate-events` - Simulate user events
+- `GET /api/trending/health` - Trending service health check
 
-## Intent Detection
+## 🧠 LLM Integration
 
+### Intent Detection
 The system automatically detects user intent from natural language queries:
+- **Category**: "Show me technology news"
+- **Source**: "News from Reuters"
+- **Nearby**: "What's happening near me?"
+- **Score**: "High quality news articles"
+- **Search**: General text search
 
-- **category**: Technology, Business, Sports, Politics, Entertainment, Health, Science, General
-- **source**: New York Times, Reuters, BBC, CNN, Fox, NBC, ABC, CBS, DW
-- **score**: High relevance score articles (threshold-based)
-- **nearby**: Location-based news within specified radius
-- **search**: General text search in titles and descriptions
+### Entity & Concept Extraction
+- **Entities**: People, places, organizations
+- **Concepts**: Topics, themes, categories
+- **Fallback**: Intelligent fallback when LLM is unavailable
 
-## Data Model
+## 📊 Trending Algorithm
 
-### News Article Structure
+### Scoring Factors
+1. **Event Weight**: VIEW (1.0), CLICK (2.0), SHARE (3.0), BOOKMARK (2.5)
+2. **Recency**: Time decay with 24-hour half-life
+3. **Geographic Relevance**: Distance-based bonus
+4. **User Engagement**: Volume of interactions
+
+### Caching Strategy
+- **Trending Cache**: 2-minute TTL for real-time data
+- **News Cache**: 10-minute TTL for static content
+- **Geographic Segmentation**: Location-based cache keys
+
+## 🗄️ Database Design
+
+### News Collection
 ```json
 {
-  "id": "unique-identifier",
+  "_id": "uuid",
   "title": "Article Title",
   "description": "Article description...",
-  "url": "https://article-url.com",
-  "publication_date": "2025-03-24T11:08:11",
-  "source_name": "Source Name",
-  "category": ["Category1", "Category2"],
+  "url": "https://example.com/article",
+  "publication_date": "2024-01-01T00:00:00Z",
+  "source_name": "News Source",
+  "category": ["technology", "business"],
   "relevance_score": 0.85,
   "latitude": 37.7749,
   "longitude": -122.4194
 }
 ```
 
-## Getting Started
+### User Events Collection
+```json
+{
+  "_id": "uuid",
+  "article_id": "article-uuid",
+  "user_id": "user-123",
+  "event_type": "CLICK",
+  "user_latitude": 37.7749,
+  "user_longitude": -122.4194,
+  "timestamp": "2024-01-01T00:00:00Z",
+  "weight": 2.0
+}
+```
+
+## 🚀 Getting Started
 
 ### Prerequisites
-- Java 17 or higher
+- Java 17+
 - Maven 3.6+
-- OpenAI API Key (optional, for real LLM functionality)
+- MongoDB 5.0+
+- Redis 6.0+
 
-### Running the Application
-
+### Installation
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd inshorts
+   git clone https://github.com/bytedheeraj/inshorts-news.git
+   cd inshorts-news
    ```
 
-2. **Set Java 17 as active**
+2. **Start MongoDB**
    ```bash
-   export JAVA_HOME=/usr/local/opt/openjdk@17
-   export PATH=$JAVA_HOME/bin:$PATH
+   mongod --dbpath /path/to/data/db
    ```
 
-3. **(Optional) Configure OpenAI API**
-   - Add your OpenAI API key to `src/main/resources/application.properties`:
-   ```properties
-   openai.api.key=your-openai-api-key-here
-   ```
-   - If no API key is provided, the system will use the fallback implementation
-
-4. **Run the application**
+3. **Start Redis**
    ```bash
-   ./mvnw spring-boot:run
+   redis-server
    ```
 
-4. **Access the application**
-   - API Base URL: `http://localhost:8080`
-   - H2 Console: `http://localhost:8080/h2-console`
-   - Health Check: `http://localhost:8080/api/news/health`
+4. **Set environment variables** (optional)
+   ```bash
+   export HUGGINGFACE_TOKEN=your_token_here
+   ```
 
-### Database Access
-- **URL**: `jdbc:h2:mem:newsdb`
-- **Username**: `sa`
-- **Password**: `password`
+5. **Run the application**
+   ```bash
+   mvn spring-boot:run
+   ```
 
-## Sample Data
+### Sample Data
+The application automatically loads sample news data from `src/main/resources/news_data.json` on startup.
 
-The system comes pre-loaded with sample news articles covering various categories:
-- Technology news (Apple, Tesla)
-- Business updates (earnings, acquisitions)
-- Sports coverage (football, championships)
-- Political developments (climate agreements)
-- Entertainment updates (Marvel movies)
-- Health breakthroughs (cancer treatment)
-- Scientific discoveries (exoplanets)
-- Local news (Palo Alto startups)
+## 🧪 Testing
 
-## Testing the System
-
-### 1. Health Check
+### Manual Testing
 ```bash
-curl http://localhost:8080/api/news/health
-```
+# Test trending API
+curl -X GET "http://localhost:8080/api/trending?lat=20.0&lon=75.0&limit=3"
 
-### 2. Get All News
-```bash
-curl http://localhost:8080/api/news/all
-```
-
-### 3. Test Contextual Query
-```bash
-curl -X POST http://localhost:8080/api/news/query \
+# Test news query
+curl -X POST "http://localhost:8080/api/news/query" \
   -H "Content-Type: application/json" \
-  -d '{
-    "query": "Latest technology news",
-    "latitude": 37.7749,
-    "longitude": -122.4194
-  }'
+  -d '{"query": "Show me technology news"}'
+
+# Simulate user events
+curl -X POST "http://localhost:8080/api/trending/simulate-events"
 ```
 
-### 4. Test Category Retrieval
-```bash
-curl http://localhost:8080/api/news/category/Technology
+## 🔍 Monitoring
+
+### Health Checks
+- **Application Health**: `/actuator/health`
+- **Trending Service**: `/api/trending/health`
+- **MongoDB Connection**: Automatic health monitoring
+- **Redis Connection**: Automatic health monitoring
+
+### Logging
+- **Log Level**: DEBUG for development
+- **Structured Logging**: JSON format with correlation IDs
+- **Performance Metrics**: Query processing time tracking
+
+## 🚀 Production Deployment
+
+### Docker Support
+```dockerfile
+FROM openjdk:17-jdk-slim
+COPY target/inshorts-0.0.1-SNAPSHOT.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/app.jar"]
 ```
 
-### 5. Test Nearby News
-```bash
-curl "http://localhost:8080/api/news/nearby?latitude=37.7749&longitude=-122.4194&radius=10"
-```
+### Environment Variables
+- `MONGODB_URI`: MongoDB connection string
+- `REDIS_URL`: Redis connection string
+- `HUGGINGFACE_TOKEN`: LLM API token
+- `SERVER_PORT`: Application port
 
-## Customization
+### Scaling Considerations
+- **Horizontal Scaling**: Stateless application design
+- **Cache Distribution**: Redis cluster for high availability
+- **Database Sharding**: MongoDB sharding for large datasets
+- **Load Balancing**: Multiple application instances
 
-### Adding New Categories
-Update the `CATEGORY_KEYWORDS` set in `LLMServiceImpl.java`
-
-### Adding New Sources
-Update the `SOURCE_KEYWORDS` set in `LLMServiceImpl.java`
-
-### Modifying Intent Detection
-Enhance the `determineIntent` method in `LLMServiceImpl.java`
-
-### Database Configuration
-Modify `application.properties` to use different databases (PostgreSQL, MySQL, etc.)
-
-## Performance Features
-
-- **In-Memory Database**: Fast data access for development and testing
-- **Efficient Queries**: Optimized JPA queries with custom SQL for complex operations
-- **Response Time Tracking**: Built-in processing time measurement
-- **Sorted Results**: Articles automatically sorted by relevance score
-
-## LLM Integration
-
-The system includes **real OpenAI API integration** with automatic fallback to a simulated LLM service:
-
-### OpenAI Integration (Primary)
-- **Real AI Processing**: Uses GPT-3.5-turbo for entity extraction, concept identification, and intent determination
-- **Automatic Fallback**: If OpenAI API is unavailable, automatically switches to simulated implementation
-- **Configurable**: Add your OpenAI API key to enable real AI functionality
-
-### Fallback Implementation (Simulated)
-- **Intent Detection**: Category, Source, Nearby, Score, Search
-- **Entity Extraction**: People names, organizations, locations, events
-- **Concept Identification**: Business terms, technology concepts, news categories
-
-## Future Enhancements
-
-- **Enhanced LLM Models**: Support for GPT-4, Claude, and other advanced models
-- **Caching Layer**: Redis integration for improved performance
-- **User Authentication**: JWT-based authentication system
-- **Rate Limiting**: API rate limiting and throttling
-- **Analytics Dashboard**: User query analytics and insights
-- **News Aggregation**: Real-time news fetching from multiple sources
-
-## Contributing
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -281,10 +291,18 @@ The system includes **real OpenAI API integration** with automatic fallback to a
 4. Add tests
 5. Submit a pull request
 
-## License
+## 📝 License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Support
+## 🙏 Acknowledgments
 
-For questions and support, please open an issue in the repository.
+- Spring Boot team for the excellent framework
+- MongoDB team for geospatial capabilities
+- Redis team for high-performance caching
+- Hugging Face for LLM integration
+- Lombok team for clean code generation
+
+---
+
+**Built with ❤️ for intelligent news discovery**

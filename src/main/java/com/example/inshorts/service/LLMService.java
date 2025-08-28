@@ -5,7 +5,7 @@ import com.example.inshorts.dto.NewsQueryRequest;
 public interface LLMService {
     
     /**
-     * Process a natural language query to extract entities, concepts, and intent
+     * Process a natural language query to extract entities, category, and intent
      * @param request The news query request
      * @return Processed request with extracted information
      */
@@ -19,9 +19,9 @@ public interface LLMService {
     String extractEntities(String query);
     
     /**
-     * Extract key concepts from the query text
+     * Extract category-related terms from the query text
      * @param query The user's query text
-     * @return Comma-separated list of concepts
+     * @return Comma-separated list of categories
      */
     String extractConcepts(String query);
     

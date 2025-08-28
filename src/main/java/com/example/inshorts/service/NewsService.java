@@ -2,7 +2,7 @@ package com.example.inshorts.service;
 
 import com.example.inshorts.dto.NewsQueryRequest;
 import com.example.inshorts.dto.NewsResponse;
-import com.example.inshorts.entity.News;
+import com.example.inshorts.dto.News;
 
 import java.util.List;
 
@@ -46,10 +46,10 @@ public interface NewsService {
     /**
      * Save a news article
      */
-    News saveNews(News news);
+    News saveNews(News newsEntity);
     
     /**
      * Save multiple news articles
      */
-    List<News> saveAllNews(List<News> newsList);
+    List<News> saveAllNews(List<News> newsEntityList);
 }
