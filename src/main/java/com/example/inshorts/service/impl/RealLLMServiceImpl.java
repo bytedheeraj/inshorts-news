@@ -1,6 +1,7 @@
 package com.example.inshorts.service.impl;
 
 import com.example.inshorts.dto.NewsQueryRequest;
+import com.example.inshorts.exception.LLMServiceException;
 import com.example.inshorts.service.LLMService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -56,11 +57,7 @@ public class RealLLMServiceImpl implements LLMService {
             return request;
         } catch (Exception e) {
             logger.error("Error calling real LLM service: {}", e.getMessage());
-            // Minimal pass-through on error
-            request.setIntent(request.getIntent());
-            request.setEntities(request.getEntities());
-            request.setCategory(request.getCategory());
-            return request;
+            throw new LLMServiceException("Failed to process query with LLM", e);
         }
     }
     
@@ -79,7 +76,7 @@ public class RealLLMServiceImpl implements LLMService {
             
         } catch (Exception e) {
             logger.error("Error extracting entities with LLM", e);
-            return extractEntitiesFallback(query);
+            throw new LLMServiceException("Failed to extract entities", e);
         }
     }
     
@@ -98,7 +95,7 @@ public class RealLLMServiceImpl implements LLMService {
             
         } catch (Exception e) {
             logger.error("Error extracting concepts with LLM", e);
-            return extractConceptsFallback(query);
+            throw new LLMServiceException("Failed to extract concepts", e);
         }
     }
     
@@ -120,7 +117,23 @@ public class RealLLMServiceImpl implements LLMService {
             
         } catch (Exception e) {
             logger.error("Error determining intent with LLM", e);
-            return determineIntentFallback(query);
+            throw new LLMServiceException("Failed to determine intent", e);
+        }
+    }
+    
+    @Override
+    public String generateSummary(String text) {
+        try {
+            String prompt = String.format(
+                "Summarize this news article in 2-3 sentences: %s", text
+            );
+            
+            String response = callHuggingFaceAPI(prompt);
+            return response.length() > 200 ? response.substring(0, 200) + "..." : response;
+            
+        } catch (Exception e) {
+            logger.error("Error generating summary with LLM", e);
+            throw new LLMServiceException("Failed to generate summary", e);
         }
     }
     

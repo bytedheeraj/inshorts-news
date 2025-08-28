@@ -39,4 +39,7 @@ public interface UserEventRepository extends MongoRepository<UserEvent, String> 
     // Find recent events for trending calculation
     @Query(value = "{}", sort = "{'timestamp': -1}")
     List<UserEvent> findRecentEvents(LocalDateTime since);
+    
+    // Count total events for a specific article
+    long countByArticleId(String articleId);
 }

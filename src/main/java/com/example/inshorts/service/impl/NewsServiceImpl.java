@@ -11,6 +11,10 @@ import com.example.inshorts.service.NewsMapper;
 import com.example.inshorts.service.NewsService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
@@ -74,7 +78,10 @@ public class NewsServiceImpl implements NewsService {
 
             long processingTime = System.currentTimeMillis() - startTime;
 
-            List<News> dtoArticles = articles == null ? List.of() : articles.stream().map(newsMapper::toDto).collect(Collectors.toList());
+            List<News> dtoArticles = articles == null ? List.of() : articles.stream()
+                .map(newsMapper::toDto)
+                .map(this::addLLMSummary) // Add LLM summaries
+                .collect(Collectors.toList());
 
             NewsResponse response = NewsResponse.builder()
                     .articles(dtoArticles)
@@ -151,33 +158,67 @@ public class NewsServiceImpl implements NewsService {
     }
 
     @Override
-    public List<News> getNewsByCategory(String category) {
-        return getNewsByCategoryEntities(category).stream().map(newsMapper::toDto).collect(Collectors.toList());
+    public Page<News> getNewsByCategory(String category, Pageable pageable) {
+        Page<NewsEntity> newsPage = newsRepository.findByCategoryContainingIgnoreCase(
+            category, 
+            PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), 
+                Sort.by("publicationDate").descending())
+        );
+        
+        return newsPage.map(newsMapper::toDto);
     }
 
     @Override
-    public List<News> getNewsBySource(String source) {
-        return newsRepository.findBySourceNameContainingIgnoreCase(source).stream().map(newsMapper::toDto).collect(Collectors.toList());
+    public Page<News> getNewsBySource(String source, Pageable pageable) {
+        Page<NewsEntity> newsPage = newsRepository.findBySourceNameContainingIgnoreCase(
+            source,
+            PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                Sort.by("publicationDate").descending())
+        );
+        
+        return newsPage.map(newsMapper::toDto);
     }
 
     @Override
-    public List<News> getNewsByScore(Double threshold) {
-        return newsRepository.findByRelevanceScoreGreaterThan(threshold).stream().map(newsMapper::toDto).collect(Collectors.toList());
+    public Page<News> getNewsByScore(Double threshold, Pageable pageable) {
+        Page<NewsEntity> newsPage = newsRepository.findByRelevanceScoreGreaterThan(
+            threshold,
+            PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                Sort.by("relevanceScore").descending())
+        );
+        
+        return newsPage.map(newsMapper::toDto);
     }
 
     @Override
-    public List<News> searchNews(String query) {
-        return newsRepository.findByTitleOrDescriptionContaining(query).stream().map(newsMapper::toDto).collect(Collectors.toList());
+    public Page<News> searchNews(String query, Pageable pageable) {
+        Page<NewsEntity> newsPage = newsRepository.findByTitleOrDescriptionContaining(
+            query,
+            PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                Sort.by("publicationDate").descending())
+        );
+        
+        return newsPage.map(newsMapper::toDto);
     }
 
     @Override
-    public List<News> getNearbyNews(Double latitude, Double longitude, Double maxDistanceKm) {
-        return getNearbyNewsEntities(latitude, longitude, maxDistanceKm).stream().map(newsMapper::toDto).collect(Collectors.toList());
+    public Page<News> getNearbyNews(Double latitude, Double longitude, Double radiusKm, Pageable pageable) {
+        Page<NewsEntity> newsPage = newsRepository.findNearbyNews(
+            latitude, longitude, radiusKm,
+            PageRequest.of(pageable.getPageNumber(), pageable.getPageSize())
+        );
+        
+        return newsPage.map(newsMapper::toDto);
     }
 
     @Override
-    public List<News> getAllNews() {
-        return newsRepository.findAll().stream().map(newsMapper::toDto).collect(Collectors.toList());
+    public Page<News> getAllNews(Pageable pageable) {
+        Page<NewsEntity> newsPage = newsRepository.findAll(
+            PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                Sort.by("publicationDate").descending())
+        );
+        
+        return newsPage.map(newsMapper::toDto);
     }
 
     @Override
@@ -190,5 +231,19 @@ public class NewsServiceImpl implements NewsService {
     public List<News> saveAllNews(List<News> newsList) {
         List<NewsEntity> entities = newsList.stream().map(newsMapper::toEntity).collect(Collectors.toList());
         return newsRepository.saveAll(entities).stream().map(newsMapper::toDto).collect(Collectors.toList());
+    }
+    
+    /**
+     * Add LLM-generated summary to news article
+     */
+    private News addLLMSummary(News news) {
+        try {
+            String summary = llmService.generateSummary(news.getTitle() + " " + news.getDescription());
+            news.setLlmSummary(summary);
+        } catch (Exception e) {
+            news.setLlmSummary("Summary not available");
+            log.warn("Failed to generate summary for article: {}", news.getTitle());
+        }
+        return news;
     }
 }

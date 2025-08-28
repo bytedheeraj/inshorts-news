@@ -31,4 +31,11 @@ public interface LLMService {
      * @return The determined intent (category, score, search, source, nearby)
      */
     String determineIntent(String query);
+
+    /**
+     * Generate a summary for a given text using the LLM.
+     * @param text The text to summarize.
+     * @return The generated summary.
+     */
+    String generateSummary(String text);
 }

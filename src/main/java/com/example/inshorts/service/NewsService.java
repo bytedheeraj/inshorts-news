@@ -3,6 +3,8 @@ package com.example.inshorts.service;
 import com.example.inshorts.dto.NewsQueryRequest;
 import com.example.inshorts.dto.NewsResponse;
 import com.example.inshorts.dto.News;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -14,34 +16,34 @@ public interface NewsService {
     NewsResponse processNewsQuery(NewsQueryRequest request);
     
     /**
-     * Get news by category
+     * Get news by category with pagination
      */
-    List<News> getNewsByCategory(String category);
+    Page<News> getNewsByCategory(String category, Pageable pageable);
     
     /**
-     * Get news by source
+     * Get news by source with pagination
      */
-    List<News> getNewsBySource(String source);
+    Page<News> getNewsBySource(String source, Pageable pageable);
     
     /**
-     * Get news by relevance score threshold
+     * Get news by relevance score threshold with pagination
      */
-    List<News> getNewsByScore(Double threshold);
+    Page<News> getNewsByScore(Double threshold, Pageable pageable);
     
     /**
-     * Search news by text query
+     * Search news by text query with pagination
      */
-    List<News> searchNews(String query);
+    Page<News> searchNews(String query, Pageable pageable);
     
     /**
-     * Get news within a certain radius of given coordinates
+     * Get news within a certain radius with pagination
      */
-    List<News> getNearbyNews(Double latitude, Double longitude, Double radiusKm);
+    Page<News> getNearbyNews(Double latitude, Double longitude, Double radiusKm, Pageable pageable);
     
     /**
-     * Get all news articles
+     * Get all news articles with pagination
      */
-    List<News> getAllNews();
+    Page<News> getAllNews(Pageable pageable);
     
     /**
      * Save a news article

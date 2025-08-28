@@ -200,13 +200,17 @@ public class TrendingServiceImpl implements TrendingService {
         Double trendingScore = calculateTrendingScore(newsEntity.getId(), userLat, userLon);
         
         // Get user engagement count
-        Long engagementCount = userEventRepository.countByArticleIdAndTimestampBetween(
-            newsEntity.getId(), LocalDateTime.now().minusHours(24), LocalDateTime.now());
+        Long userEngagementCount = userEventRepository.countByArticleId(newsEntity.getId());
         
         // Generate LLM summary
-        String summary = generateArticleSummary(newsEntity.getTitle(), newsEntity.getDescription());
+        String llmSummary;
+        try {
+            llmSummary = llmService.generateSummary(newsEntity.getTitle() + " " + newsEntity.getDescription());
+        } catch (Exception e) {
+            llmSummary = "Summary not available";
+            log.warn("Failed to generate summary for trending article: {}", newsEntity.getTitle());
+        }
         
-        // Create trending article using Lombok builder
         return TrendingArticle.builder()
                 .id(newsEntity.getId())
                 .title(newsEntity.getTitle())
@@ -216,11 +220,11 @@ public class TrendingServiceImpl implements TrendingService {
                 .sourceName(newsEntity.getSourceName())
                 .category(newsEntity.getCategory())
                 .relevanceScore(newsEntity.getRelevanceScore())
-                .llmSummary(summary)
+                .llmSummary(llmSummary)
                 .latitude(newsEntity.getLatitude())
                 .longitude(newsEntity.getLongitude())
                 .trendingScore(trendingScore)
-                .userEngagementCount(engagementCount)
+                .userEngagementCount(userEngagementCount)
                 .build();
     }
 

@@ -54,29 +54,5 @@ public class NewsMapper {
         
         return entity;
     }
-
-    /**
-     * Convert list of NewsEntity to list of News DTOs
-     */
-    public List<News> toDtoList(List<NewsEntity> entities) {
-        if (entities == null) {
-            return null;
-        }
-        return entities.stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Convert list of News DTOs to list of NewsEntity
-     */
-    public List<NewsEntity> toEntityList(List<News> dtos) {
-        if (dtos == null) {
-            return null;
-        }
-        return dtos.stream()
-                .map(this::toEntity)
-                .collect(Collectors.toList());
-    }
 }
 
