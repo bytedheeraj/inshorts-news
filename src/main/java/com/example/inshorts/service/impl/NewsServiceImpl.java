@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -203,12 +204,56 @@ public class NewsServiceImpl implements NewsService {
 
     @Override
     public Page<News> getNearbyNews(Double latitude, Double longitude, Double radiusKm, Pageable pageable) {
-        Page<NewsEntity> newsPage = newsRepository.findNearbyNews(
-            latitude, longitude, radiusKm,
-            PageRequest.of(pageable.getPageNumber(), pageable.getPageSize())
-        );
-        
-        return newsPage.map(newsMapper::toDto);
+        // Use MongoTemplate for geospatial queries with pagination
+        try {
+            NearQuery nearQuery = NearQuery.near(latitude, longitude)
+                    .maxDistance(radiusKm * 1000)
+                    .spherical(true);
+
+            GeoNearOperation geoNearOp = Aggregation.geoNear(nearQuery, "news_data");
+            
+            // Add pagination and sorting
+            Aggregation aggregation = Aggregation.newAggregation(
+                geoNearOp,
+                Aggregation.skip((long) pageable.getPageNumber() * pageable.getPageSize()),
+                Aggregation.limit(pageable.getPageSize())
+            );
+            
+            AggregationResults<NewsEntity> results = mongoTemplate.aggregate(aggregation, "news_data", NewsEntity.class);
+            List<NewsEntity> news = results.getMappedResults();
+            
+            // For pagination, we need to get total count separately
+            long totalCount = getNearbyNewsCount(latitude, longitude, radiusKm);
+            
+            // Create a custom Page implementation
+            return new PageImpl<>(news.stream().map(newsMapper::toDto).collect(Collectors.toList()), pageable, totalCount);
+            
+        } catch (Exception e) {
+            log.error("Error in geospatial query with pagination: {}", e.getMessage(), e);
+            // Fallback to simple filtering with pagination
+            List<NewsEntity> allNearby = getNearbyNewsEntities(latitude, longitude, radiusKm);
+            int start = (int) (pageable.getPageNumber() * pageable.getPageSize());
+            int end = Math.min(start + pageable.getPageSize(), allNearby.size());
+            List<NewsEntity> pageContent = allNearby.subList(start, end);
+            
+            return new PageImpl<>(pageContent.stream().map(newsMapper::toDto).collect(Collectors.toList()), pageable, allNearby.size());
+        }
+    }
+    
+    private long getNearbyNewsCount(Double latitude, Double longitude, Double radiusKm) {
+        try {
+            NearQuery nearQuery = NearQuery.near(latitude, longitude)
+                    .maxDistance(radiusKm * 1000)
+                    .spherical(true);
+
+            GeoNearOperation geoNearOp = Aggregation.geoNear(nearQuery, "news_data");
+            Aggregation aggregation = Aggregation.newAggregation(geoNearOp);
+            AggregationResults<NewsEntity> results = mongoTemplate.aggregate(aggregation, "news_data", NewsEntity.class);
+            return results.getMappedResults().size();
+        } catch (Exception e) {
+            log.error("Error getting nearby news count: {}", e.getMessage(), e);
+            return getNearbyNewsEntities(latitude, longitude, radiusKm).size();
+        }
     }
 
     @Override

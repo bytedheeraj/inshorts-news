@@ -31,4 +31,6 @@ public class News {
     private Double latitude;
 
     private Double longitude;
+    
+    private String llmSummary;
 }

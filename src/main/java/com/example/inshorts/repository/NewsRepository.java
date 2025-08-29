@@ -25,10 +25,7 @@ public interface NewsRepository extends MongoRepository<NewsEntity, String> {
     Page<NewsEntity> findByRelevanceScoreGreaterThan(Double threshold, Pageable pageable);
     Page<NewsEntity> findByTitleOrDescriptionContaining(String searchTerm, Pageable pageable);
     
-    // Nearby news methods
-    @Query(value = "{}", fields = "{'id': 1, 'title': 1, 'description': 1, 'url': 1, 'publicationDate': 1, 'sourceName': 1, 'category': 1, 'relevanceScore': 1, 'latitude': 1, 'longitude': 1, 'distance': 1}")
-    List<NewsEntity> findNearbyNews(Double latitude, Double longitude, Double maxDistance);
-    
-    @Query(value = "{}", fields = "{'id': 1, 'title': 1, 'description': 1, 'url': 1, 'publicationDate': 1, 'sourceName': 1, 'category': 1, 'relevanceScore': 1, 'latitude': 1, 'longitude': 1, 'distance': 1}")
-    Page<NewsEntity> findNearbyNews(Double latitude, Double longitude, Double maxDistance, Pageable pageable);
+    // Nearby news methods - these will be implemented using MongoTemplate in the service
+    // since MongoDB doesn't support pagination with $geoNear in repository methods
+    // The service implementation handles the geospatial queries with pagination
 }

@@ -29,6 +29,7 @@ public class NewsMapper {
                 .relevanceScore(entity.getRelevanceScore())
                 .latitude(entity.getLatitude())
                 .longitude(entity.getLongitude())
+                .llmSummary(null) // Will be populated by service layer
                 .build();
     }
 
