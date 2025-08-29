@@ -1,5 +1,7 @@
 package com.example.inshorts.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
@@ -19,18 +21,24 @@ public class CacheConfig {
 
     @Bean
     public CacheManager cacheManager(RedisConnectionFactory connectionFactory) {
+        // Create ObjectMapper with JavaTimeModule
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+
+        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(mapper);
+
         RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofMinutes(5)) // 5 minutes TTL
+                .entryTtl(Duration.ofMinutes(5))
                 .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
-                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer()))
+                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(serializer)) // use custom serializer
                 .disableCachingNullValues();
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(config)
-                .withCacheConfiguration("trending", 
-                    config.entryTtl(Duration.ofMinutes(2))) // Trending cache expires faster
-                .withCacheConfiguration("news", 
-                    config.entryTtl(Duration.ofMinutes(10))) // News cache lasts longer
+                .withCacheConfiguration("trending",
+                        config.entryTtl(Duration.ofMinutes(2)))
+                .withCacheConfiguration("news",
+                        config.entryTtl(Duration.ofMinutes(10)))
                 .build();
     }
 }

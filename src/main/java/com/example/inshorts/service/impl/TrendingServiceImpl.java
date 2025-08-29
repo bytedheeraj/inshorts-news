@@ -12,10 +12,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.geo.Distance;
+import org.springframework.data.geo.Metrics;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.aggregation.GeoNearOperation;
+import org.springframework.data.mongodb.core.geo.GeoJsonPoint;
 import org.springframework.data.mongodb.core.query.NearQuery;
 import org.springframework.stereotype.Service;
 
@@ -43,25 +46,44 @@ public class TrendingServiceImpl implements TrendingService {
     @Cacheable(value = "trending", key = "#latitude + '_' + #longitude + '_' + #limit")
     public List<TrendingArticle> getTrendingNews(Double latitude, Double longitude, Integer limit) {
         log.info("Fetching trending news for location: ({}, {}) with limit: {}", latitude, longitude, limit);
-        
+
         try {
-            // Get nearby news articles using MongoDB geospatial query
-            List<NewsEntity> nearbyNews = getNearbyNews(latitude, longitude, AppConstants.TRENDING_RADIUS); // 50km radius
-            
+            List<NewsEntity> nearbyNews = getNearbyNews(latitude, longitude, 50.0); // 50km radius
+
             if (nearbyNews.isEmpty()) {
                 log.warn("No nearby news found for location: ({}, {})", latitude, longitude);
                 return new ArrayList<>();
             }
 
-            // Enrich news with trending data and LLM summaries
-            List<TrendingArticle> trendingArticles = nearbyNews.stream()
-                    .map(news -> enrichNewsWithTrendingData(news, latitude, longitude))
+            if (nearbyNews.size() > 10) {
+                log.info("Nearby news list size is more than 10: {}", nearbyNews.size());
+            }
+
+            // Step 1: Build partial articles with trending score and user engagement
+            List<TrendingArticle> topArticles = nearbyNews.stream()
+                    .map(news -> TrendingArticle.builder()
+                            .id(news.getId())
+                            .title(news.getTitle())
+                            .description(news.getDescription())
+                            .url(news.getUrl())
+                            .publicationDate(news.getPublicationDate())
+                            .sourceName(news.getSourceName())
+                            .category(news.getCategory())
+                            .relevanceScore(news.getRelevanceScore())
+                            .latitude(getLatitude(news))
+                            .longitude(getLongitude(news))
+                            .trendingScore(calculateTrendingScore(news.getId(), latitude, longitude))
+                            .userEngagementCount(userEventRepository.countByArticleId(news.getId()))
+                            .build())
                     .sorted((a, b) -> Double.compare(b.getTrendingScore(), a.getTrendingScore()))
                     .limit(limit)
                     .collect(Collectors.toList());
 
-            log.info("Found {} trending articles for location: ({}, {})", trendingArticles.size(), latitude, longitude);
-            return trendingArticles;
+            // Step 2: Enrich only top N with LLM summary
+            topArticles.replaceAll(this::enrichNewsWithTrendingData);
+
+            log.info("Found {} trending articles for location: ({}, {})", topArticles.size(), latitude, longitude);
+            return topArticles;
 
         } catch (Exception e) {
             log.error("Error fetching trending news: {}", e.getMessage(), e);
@@ -69,31 +91,49 @@ public class TrendingServiceImpl implements TrendingService {
         }
     }
 
+
+
     @Override
     @Cacheable(value = "trending", key = "'category_' + #category + '_' + #latitude + '_' + #longitude + '_' + #limit")
     public List<TrendingArticle> getTrendingNewsByCategory(String category, Double latitude, Double longitude, Integer limit) {
         log.info("Fetching trending news for category: {} at location: ({}, {})", category, latitude, longitude);
-        
+
         try {
             List<NewsEntity> categoryNews = newsRepository.findByCategoryContainingIgnoreCase(category);
-            
+
             if (categoryNews.isEmpty()) {
                 log.warn("No news found for category: {}", category);
                 return new ArrayList<>();
             }
 
-            // Filter by distance and enrich with trending data
-            List<TrendingArticle> trendingArticles = categoryNews.stream()
-                    .filter(news -> hasValidCoordinates(news) && 
+            // Step 1: filter by valid coordinates and distance, build partial articles
+            List<TrendingArticle> partialArticles = categoryNews.stream()
+                    .filter(news -> hasValidCoordinates(news) &&
                             calculateDistance(latitude, longitude, getLatitude(news), getLongitude(news)) <= 50.0)
-                    .map(news -> enrichNewsWithTrendingData(news, latitude, longitude))
-                    .sorted((a, b) -> Double.compare(b.getTrendingScore(), a.getTrendingScore()))
-                    .limit(limit)
+                    .map(news -> TrendingArticle.builder()
+                            .id(news.getId())
+                            .title(news.getTitle())
+                            .description(news.getDescription())
+                            .url(news.getUrl())
+                            .publicationDate(news.getPublicationDate())
+                            .sourceName(news.getSourceName())
+                            .category(news.getCategory())
+                            .relevanceScore(news.getRelevanceScore())
+                            .latitude(getLatitude(news))
+                            .longitude(getLongitude(news))
+                            .trendingScore(calculateTrendingScore(news.getId(), latitude, longitude))
+                            .userEngagementCount(userEventRepository.countByArticleId(news.getId()))
+                            .build())
+                    .sorted((a, b) -> Double.compare(b.getTrendingScore(), a.getTrendingScore())) // Step 2: sort by trending score
+                    .limit(limit) // Step 3: take top N
                     .collect(Collectors.toList());
 
-            log.info("Found {} trending articles for category: {} at location: ({}, {})", 
-                    trendingArticles.size(), category, latitude, longitude);
-            return trendingArticles;
+            // Step 4: enrich only top N with LLM summaries
+            partialArticles.replaceAll(this::enrichNewsWithTrendingData);
+
+            log.info("Found {} trending articles for category: {} at location: ({}, {})",
+                    partialArticles.size(), category, latitude, longitude);
+            return partialArticles;
 
         } catch (Exception e) {
             log.error("Error fetching trending news by category: {}", e.getMessage(), e);
@@ -105,7 +145,7 @@ public class TrendingServiceImpl implements TrendingService {
     @CacheEvict(value = "trending", allEntries = true)
     public void simulateUserEvents() {
         log.info("Starting user event simulation...");
-        
+
         try {
             List<NewsEntity> allNews = newsRepository.findAll();
             if (allNews.isEmpty()) {
@@ -120,7 +160,7 @@ public class TrendingServiceImpl implements TrendingService {
             for (NewsEntity newsEntity : allNews) {
                 // Generate 5-20 events per article
                 int eventCount = random.nextInt(16) + 5;
-                
+
                 for (int i = 0; i < eventCount; i++) {
                     UserEvent event = generateUserEvent(newsEntity, now, random);
                     events.add(event);
@@ -179,14 +219,17 @@ public class TrendingServiceImpl implements TrendingService {
 
     private List<NewsEntity> getNearbyNews(Double latitude, Double longitude, Double maxDistanceKm) {
         try {
-            // Use MongoDB's geospatial aggregation
-            NearQuery nearQuery = NearQuery.near(latitude, longitude)
-                    .maxDistance(maxDistanceKm * 1000) // Convert km to meters
+            GeoJsonPoint point = new GeoJsonPoint(longitude, latitude);
+
+            NearQuery nearQuery = NearQuery.near(point, Metrics.KILOMETERS)
+                    .maxDistance(new Distance(AppConstants.TRENDING_RADIUS, Metrics.KILOMETERS))
                     .spherical(true);
 
-            GeoNearOperation geoNearOp = Aggregation.geoNear(nearQuery, "news_data");
+            GeoNearOperation geoNearOp = Aggregation.geoNear(nearQuery, "distance");
             Aggregation aggregation = Aggregation.newAggregation(geoNearOp);
-            AggregationResults<NewsEntity> results = mongoTemplate.aggregate(aggregation, "news_data", NewsEntity.class);
+
+            AggregationResults<NewsEntity> results =
+                    mongoTemplate.aggregate(aggregation, "news_data", NewsEntity.class);
 
             return results.getMappedResults();
 
@@ -196,61 +239,38 @@ public class TrendingServiceImpl implements TrendingService {
         }
     }
 
-    private TrendingArticle enrichNewsWithTrendingData(NewsEntity newsEntity, Double userLat, Double userLon) {
-        // Calculate trending score
-        Double trendingScore = calculateTrendingScore(newsEntity.getId(), userLat, userLon);
-        
-        // Get user engagement count
-        Long userEngagementCount = userEventRepository.countByArticleId(newsEntity.getId());
-        
-        // Generate LLM summary
-        String llmSummary;
+    private TrendingArticle enrichNewsWithTrendingData(TrendingArticle article) {
         try {
-            llmSummary = llmService.generateSummary(newsEntity.getTitle() + " " + newsEntity.getDescription());
+            String summary = llmService.generateSummary(article.getTitle() + " " + article.getDescription());
+            article.setLlmSummary(summary);
         } catch (Exception e) {
-            llmSummary = "Summary not available";
-            log.warn("Failed to generate summary for trending article: {}", newsEntity.getTitle());
+            article.setLlmSummary("Summary not available");
+            log.warn("Failed to generate summary for trending article: {}", article.getTitle());
         }
-        
-        return TrendingArticle.builder()
-                .id(newsEntity.getId())
-                .title(newsEntity.getTitle())
-                .description(newsEntity.getDescription())
-                .url(newsEntity.getUrl())
-                .publicationDate(newsEntity.getPublicationDate())
-                .sourceName(newsEntity.getSourceName())
-                .category(newsEntity.getCategory())
-                .relevanceScore(newsEntity.getRelevanceScore())
-                .llmSummary(llmSummary)
-                .latitude(getLatitude(newsEntity))
-                .longitude(getLongitude(newsEntity))
-                .trendingScore(trendingScore)
-                .userEngagementCount(userEngagementCount)
-                .build();
+        return article;
     }
 
     public String generateArticleSummary(String title, String description) {
         try {
             // Use LLM service to generate summary
-            String prompt = String.format("Summarize this news article in 2-3 sentences: Title: %s. Description: %s", 
+            String prompt = String.format("Summarize this news article in 2-3 sentences: Title: %s. Description: %s",
                     title, description);
-            
+
             // For now, return a simple summary. In production, call the actual LLM service
-            return String.format("This article discusses %s. %s", 
-                    title.toLowerCase(), 
+            return String.format("This article discusses %s. %s",
+                    title.toLowerCase(),
                     description.length() > 100 ? description.substring(0, 100) + "..." : description);
-                    
+
         } catch (Exception e) {
             log.warn("Error generating LLM summary, using fallback: {}", e.getMessage());
             return "Summary not available";
         }
     }
-
     private UserEvent generateUserEvent(NewsEntity newsEntity, LocalDateTime now, Random random) {
         // Generate random user location near the article location
         Double userLat = getLatitude(newsEntity) + (random.nextDouble() - 0.5) * 0.1; // ±0.05 degrees
         Double userLon = getLongitude(newsEntity) + (random.nextDouble() - 0.5) * 0.1;
-        
+
         // Random event type with weighted distribution
         UserEvent.EventType eventType;
         double rand = random.nextDouble();
@@ -263,30 +283,35 @@ public class TrendingServiceImpl implements TrendingService {
         } else {
             eventType = UserEvent.EventType.BOOKMARK; // 10% bookmarks
         }
-        
+
         // Random timestamp within last 24 hours
         LocalDateTime eventTime = now.minusHours(random.nextInt(24))
                 .minusMinutes(random.nextInt(60))
                 .minusSeconds(random.nextInt(60));
-        
+
         return new UserEvent(
-            UUID.randomUUID().toString(),
-            newsEntity.getId(),
-            "user_" + random.nextInt(1000),
-            eventType,
-            userLat,
-            userLon,
-            eventTime
+                UUID.randomUUID().toString(),
+                newsEntity.getId(),
+                "user_" + random.nextInt(1000),
+                eventType,
+                userLat,
+                userLon,
+                eventTime
         );
     }
 
     private Double getEventWeight(UserEvent.EventType eventType) {
         switch (eventType) {
-            case VIEW: return 1.0;
-            case CLICK: return 2.0;
-            case SHARE: return 3.0;
-            case BOOKMARK: return 4.0;
-            default: return 1.0;
+            case VIEW:
+                return 1.0;
+            case CLICK:
+                return 2.0;
+            case SHARE:
+                return 3.0;
+            case BOOKMARK:
+                return 4.0;
+            default:
+                return 1.0;
         }
     }
 
@@ -305,18 +330,18 @@ public class TrendingServiceImpl implements TrendingService {
 
         return R * c;
     }
-    
+
     private boolean hasValidCoordinates(NewsEntity news) {
         return (news.getLocation() != null) || (news.getLatitude() != null && news.getLongitude() != null);
     }
-    
+
     private Double getLatitude(NewsEntity news) {
         if (news.getLocation() != null) {
             return news.getLocation().getY(); // Point.getY() returns latitude
         }
         return news.getLatitude();
     }
-    
+
     private Double getLongitude(NewsEntity news) {
         if (news.getLocation() != null) {
             return news.getLocation().getX(); // Point.getX() returns longitude
