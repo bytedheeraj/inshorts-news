@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.geo.Point;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -58,11 +59,30 @@ public class DataLoaderService implements CommandLineRunner {
 
         try (InputStream inputStream = resource.getInputStream()) {
             List<NewsEntity> newsEntityList = mapper.readValue(inputStream, new TypeReference<List<NewsEntity>>() {});
+            
+            // Process the loaded entities to create Point objects from latitude/longitude
+            newsEntityList.forEach(this::enrichWithLocationPoint);
+            
             log.info("Parsed {} news articles from JSON file", newsEntityList.size());
             return newsEntityList;
         } catch (IOException e) {
             log.error("Failed to read news_data.json: {}", e.getMessage());
             throw e;
+        }
+    }
+    
+    /**
+     * Enrich NewsEntity with Point location from latitude and longitude
+     */
+    private void enrichWithLocationPoint(NewsEntity newsEntity) {
+        if (newsEntity.getLatitude() != null && newsEntity.getLongitude() != null) {
+            // Create Point with longitude first, then latitude (GeoJSON spec)
+            Point point = new Point(newsEntity.getLongitude(), newsEntity.getLatitude());
+            newsEntity.setLocation(point);
+            log.debug("Created Point location ({}, {}) for article: {}", 
+                newsEntity.getLongitude(), newsEntity.getLatitude(), newsEntity.getTitle());
+        } else {
+            log.warn("Missing coordinates for article: {}", newsEntity.getTitle());
         }
     }
 }

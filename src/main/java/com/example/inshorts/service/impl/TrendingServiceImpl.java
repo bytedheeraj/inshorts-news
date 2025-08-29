@@ -84,7 +84,8 @@ public class TrendingServiceImpl implements TrendingService {
 
             // Filter by distance and enrich with trending data
             List<TrendingArticle> trendingArticles = categoryNews.stream()
-                    .filter(news -> calculateDistance(latitude, longitude, news.getLatitude(), news.getLongitude()) <= 50.0)
+                    .filter(news -> hasValidCoordinates(news) && 
+                            calculateDistance(latitude, longitude, getLatitude(news), getLongitude(news)) <= 50.0)
                     .map(news -> enrichNewsWithTrendingData(news, latitude, longitude))
                     .sorted((a, b) -> Double.compare(b.getTrendingScore(), a.getTrendingScore()))
                     .limit(limit)
@@ -221,8 +222,8 @@ public class TrendingServiceImpl implements TrendingService {
                 .category(newsEntity.getCategory())
                 .relevanceScore(newsEntity.getRelevanceScore())
                 .llmSummary(llmSummary)
-                .latitude(newsEntity.getLatitude())
-                .longitude(newsEntity.getLongitude())
+                .latitude(getLatitude(newsEntity))
+                .longitude(getLongitude(newsEntity))
                 .trendingScore(trendingScore)
                 .userEngagementCount(userEngagementCount)
                 .build();
@@ -247,8 +248,8 @@ public class TrendingServiceImpl implements TrendingService {
 
     private UserEvent generateUserEvent(NewsEntity newsEntity, LocalDateTime now, Random random) {
         // Generate random user location near the article location
-        Double userLat = newsEntity.getLatitude() + (random.nextDouble() - 0.5) * 0.1; // ±0.05 degrees
-        Double userLon = newsEntity.getLongitude() + (random.nextDouble() - 0.5) * 0.1;
+        Double userLat = getLatitude(newsEntity) + (random.nextDouble() - 0.5) * 0.1; // ±0.05 degrees
+        Double userLon = getLongitude(newsEntity) + (random.nextDouble() - 0.5) * 0.1;
         
         // Random event type with weighted distribution
         UserEvent.EventType eventType;
@@ -303,5 +304,23 @@ public class TrendingServiceImpl implements TrendingService {
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
         return R * c;
+    }
+    
+    private boolean hasValidCoordinates(NewsEntity news) {
+        return (news.getLocation() != null) || (news.getLatitude() != null && news.getLongitude() != null);
+    }
+    
+    private Double getLatitude(NewsEntity news) {
+        if (news.getLocation() != null) {
+            return news.getLocation().getY(); // Point.getY() returns latitude
+        }
+        return news.getLatitude();
+    }
+    
+    private Double getLongitude(NewsEntity news) {
+        if (news.getLocation() != null) {
+            return news.getLocation().getX(); // Point.getX() returns longitude
+        }
+        return news.getLongitude();
     }
 }

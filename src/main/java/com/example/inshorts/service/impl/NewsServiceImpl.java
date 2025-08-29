@@ -140,11 +140,30 @@ public class NewsServiceImpl implements NewsService {
             return news;
         } catch (Exception e) {
             log.error("Error in geospatial query: {}", e.getMessage(), e);
+            // Fallback to manual distance calculation using Point location or individual coordinates
             return newsRepository.findAll().stream()
-                    .filter(n -> n.getLatitude() != null && n.getLongitude() != null)
-                    .filter(n -> calculateDistance(latitude, longitude, n.getLatitude(), n.getLongitude()) <= maxDistanceKm)
+                    .filter(n -> hasValidCoordinates(n))
+                    .filter(n -> calculateDistance(latitude, longitude, getLatitude(n), getLongitude(n)) <= maxDistanceKm)
                     .collect(Collectors.toList());
         }
+    }
+    
+    private boolean hasValidCoordinates(NewsEntity news) {
+        return (news.getLocation() != null) || (news.getLatitude() != null && news.getLongitude() != null);
+    }
+    
+    private Double getLatitude(NewsEntity news) {
+        if (news.getLocation() != null) {
+            return news.getLocation().getY(); // Point.getY() returns latitude
+        }
+        return news.getLatitude();
+    }
+    
+    private Double getLongitude(NewsEntity news) {
+        if (news.getLocation() != null) {
+            return news.getLocation().getX(); // Point.getX() returns longitude
+        }
+        return news.getLongitude();
     }
 
     private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {

@@ -2,6 +2,7 @@ package com.example.inshorts.service;
 
 import com.example.inshorts.dto.News;
 import com.example.inshorts.entity.NewsEntity;
+import org.springframework.data.geo.Point;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,6 +19,19 @@ public class NewsMapper {
             return null;
         }
 
+        // Extract coordinates from Point location if available, fallback to individual fields
+        Double latitude = null;
+        Double longitude = null;
+        
+        if (entity.getLocation() != null) {
+            latitude = entity.getLocation().getY(); // Point.getY() returns latitude
+            longitude = entity.getLocation().getX(); // Point.getX() returns longitude
+        } else {
+            // Fallback to individual coordinate fields
+            latitude = entity.getLatitude();
+            longitude = entity.getLongitude();
+        }
+
         return News.builder()
                 .id(entity.getId())
                 .title(entity.getTitle())
@@ -27,8 +41,8 @@ public class NewsMapper {
                 .sourceName(entity.getSourceName())
                 .category(entity.getCategory())
                 .relevanceScore(entity.getRelevanceScore())
-                .latitude(entity.getLatitude())
-                .longitude(entity.getLongitude())
+                .latitude(latitude)
+                .longitude(longitude)
                 .llmSummary(null) // Will be populated by service layer
                 .build();
     }
@@ -52,6 +66,12 @@ public class NewsMapper {
         entity.setRelevanceScore(dto.getRelevanceScore());
         entity.setLatitude(dto.getLatitude());
         entity.setLongitude(dto.getLongitude());
+        
+        // Create Point location from coordinates if available
+        if (dto.getLatitude() != null && dto.getLongitude() != null) {
+            Point point = new Point(dto.getLongitude(), dto.getLatitude()); // GeoJSON: [longitude, latitude]
+            entity.setLocation(point);
+        }
         
         return entity;
     }

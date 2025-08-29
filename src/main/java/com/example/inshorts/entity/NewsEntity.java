@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.data.mongodb.core.index.GeoSpatialIndexType;
 import org.springframework.data.mongodb.core.index.GeoSpatialIndexed;
+import org.springframework.data.geo.Point;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -47,7 +48,9 @@ public class NewsEntity {
 
     // GeoJSON Point for geospatial queries
     @GeoSpatialIndexed(type = GeoSpatialIndexType.GEO_2DSPHERE)
-    private double[] location; // [longitude, latitude] as per GeoJSON spec
+    private Point location; // Spring Data MongoDB Point for better geospatial support
+                              // Point.getX() returns longitude, Point.getY() returns latitude
+                              // This follows GeoJSON specification: [longitude, latitude]
     
     // Keep these for backward compatibility and data loading
     @JsonProperty("latitude")
